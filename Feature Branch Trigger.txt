@@ -1,0 +1,59 @@
+name: Build APK on PR Approval (Feature Branches)
+
+on:
+  pull_request_review:
+    types: [submitted]   # fires whenever a review is submitted
+
+jobs:
+  build-apk:
+    # ✅ only run if the review was APPROVED and the PR source branch starts with feature/
+    if: github.event.review.state == 'approved' && startsWith(github.event.pull_request.head.ref, 'feature/')
+    runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+    steps:
+      - name: Checkout approved PR commit
+        uses: actions/checkout@v4
+        with:
+          # checkout the exact commit from the feature branch that was approved
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run lint
+        run: npm run lint
+
+      - name: Run tests
+        run: npm test
+
+      # 👇 Add Android build step
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          
+      - name: Build DevDebug APK
+        working-directory: android
+        run: ./gradlew assembleDevDebug    
+
+      - name: Build Android APK
+        working-directory: android
+        run: ./gradlew assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        
+        with:
+          name: android-apks
+          path: android/app/build/outputs/apk/**/*.apk
+
+
+
+ipa+Fastlane
